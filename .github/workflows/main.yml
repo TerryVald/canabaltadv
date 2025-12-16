@@ -1,17 +1,22 @@
 name: Build GBA ROM
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitarm:20210726
+    container: devkitpro/devkitarm:20200730
     
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Download and rebuild libtonc
+      run: |
+        cd /tmp
+        git clone https://github.com/devkitPro/libtonc.git
+        cd libtonc
+        make install
     
     - name: Build ROM
       run: make
