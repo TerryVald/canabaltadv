@@ -11,7 +11,7 @@ SPECS	:= -specs=gba_mb.specs
 ARCH	:= -mthumb-interwork -mthumb
 
 ASFLAGS		:= -mthumb-interwork
-CFLAGS	:= $(ARCH) $(INCLUDE) -O2 -Wall -fno-strict-aliasing -std=c99
+CFLAGS	:= $(ARCH) $(INCLUDE) -O2 -Wall -fno-strict-aliasing
 LDFLAGS		:= $(ARCH) $(SPECS) $(LIBPATHS) -lc $(LIBS) -Wl,-Map,$(PROJ).map
 
 ROMNAME := canabalt
