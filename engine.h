@@ -1,7 +1,7 @@
 #ifndef _ENGINE_H_
 #define _ENGINE_H_
 
-char *dbg_str;
+extern char *dbg_str;
 
 /*
 #define ENGINE_DEBUG(str) (nocash_puts(str))
