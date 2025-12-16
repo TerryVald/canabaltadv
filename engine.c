@@ -2,6 +2,8 @@
 
 #include "engine.h"
 
+char *dbg_str;
+
 // obj globals
 OBJ_ATTR obj_buffer[MAX_OBJS];
 OBJ_AFFINE *obj_aff_buffer= (OBJ_AFFINE*)obj_buffer;
