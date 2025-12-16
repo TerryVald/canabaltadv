@@ -1,29 +1,11 @@
-name: Build GBA ROM
+name: TEST ACTIONS VISIBILITY
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "master" ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Download source
-      uses: actions/checkout@v3
-
-    - name: Install devkitARM
-      run: |
-        sudo apt update
-        sudo apt install -y gcc-arm-none-eabi binutils-arm-none-eabi make
-
-    - name: Build game
-      run: |
-        make
-
-    - name: Upload ROM
-      uses: actions/upload-artifact@v3
-      with:
-        name: canabalt-gba
-        path: "*.gba"
+      - name: Say hello
+        run: echo "GitHub Actions fonctionne"
