@@ -12,23 +12,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install devkitARM
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget
-        wget https://apt.devkitpro.org/install-devkitpro-pacman
-        chmod +x ./install-devkitpro-pacman
-        sudo ./install-devkitpro-pacman
-        sudo dkp-pacman -Syu --noconfirm
-        sudo dkp-pacman -S --noconfirm gba-dev
-    
-    - name: Build ROM
-      run: |
-        export DEVKITPRO=/opt/devkitpro
-        export DEVKITARM=/opt/devkitpro/devkitARM
-        export PATH=$DEVKITARM/bin:$PATH
-        make
-    
+    - name: Build with devkitARM docker
+      uses: devkitPro/devkitarm-action@v1
+      with:
+        command: make
+
     - name: Upload ROM
       uses: actions/upload-artifact@v4
       with:
