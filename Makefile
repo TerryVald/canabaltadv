@@ -12,7 +12,7 @@ ARCH	:= -mthumb-interwork -mthumb
 
 ASFLAGS		:= -mthumb-interwork
 CFLAGS	:= $(ARCH) $(INCLUDE) -O2 -Wall -fno-strict-aliasing -std=c99
-LDFLAGS		:= $(ARCH) $(SPECS) $(LIBPATHS) $(LIBS) -Wl,-Map,$(PROJ).map
+LDFLAGS		:= $(ARCH) $(SPECS) $(LIBPATHS) $(LIBS) -Wl,-Map,$(PROJ).map -lc
 
 ROMNAME := canabalt
 
