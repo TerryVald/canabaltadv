@@ -35,6 +35,17 @@ player_t guy;
 
 OBJ_ATTR *score_objs[8];
 
+// Game state
+typedef enum {
+	STATE_TITLE,
+	STATE_PLAYING,
+	STATE_PAUSED,
+	STATE_GAME_OVER
+} game_state_t;
+
+game_state_t game_state = STATE_TITLE;
+uint32_t title_blink_counter = 0;
+
 static uint se_index_fast(uint tx, uint ty, u16 bgcnt) {
 	uint n= tx + ty*32;
 	if(tx >= 32)
@@ -100,6 +111,28 @@ static void set_score(uint32_t score) {
 	}
 }
 
+static void draw_title_screen() {
+	// Simple title screen using text
+	tte_init_se_default(0, BG_CBB(2)|BG_SBB(28));
+	tte_set_pos(32, 60);
+	tte_write("#{P:48,60}CANABALT");
+	tte_set_pos(32, 100);
+	tte_write("#{P:56,100}Press A to start");
+}
+
+static void draw_pause_screen() {
+	tte_init_se_default(0, BG_CBB(2)|BG_SBB(28));
+	tte_set_pos(32, 70);
+	tte_write("#{P:80,70}PAUSED");
+	tte_set_pos(32, 90);
+	tte_write("#{P:56,90}Press Start to resume");
+}
+
+static void clear_title_screen() {
+	// Clear the text layer
+	tte_erase_screen();
+}
+
 int main(void) {
 	// set up irqs
 	fnptr isr = NULL;
@@ -107,21 +140,55 @@ int main(void) {
 	irq_add(II_VBLANK, isr);
 	
 	// set up backgrounds tiles
-	dma3_cpy(pal_bg_bank[0], buildingsPal, buildingsPalLen); // load colors into bgpal
+	dma3_cpy(pal_bg_bank[0], buildingsPal, buildingsPalLen);
 	dma3_cpy(pal_bg_bank[1], midgroundPal, midgroundPalLen);
 	dma3_cpy(pal_bg_bank[2], backgroundPal, backgroundPalLen);
-	// 26-33 as screenblocks. 4 bits per pixel, 64x32 tiles
-	// use block 0 as tile charblock
-	dma3_cpy(&tile_mem[0][0], buildingsTiles, buildingsTilesLen); // block 1 as midground charblock
-	dma3_cpy(&tile_mem[1][0], midgroundTiles, midgroundTilesLen); // block 2 background charblock
-	dma3_cpy(&tile_mem[2][0], backgroundTiles, backgroundTilesLen); 
+	dma3_cpy(&tile_mem[0][0], buildingsTiles, buildingsTilesLen);
+	dma3_cpy(&tile_mem[1][0], midgroundTiles, midgroundTilesLen);
+	dma3_cpy(&tile_mem[2][0], backgroundTiles, backgroundTilesLen);
 
 	SCR_ENTRY *bg0_map = se_mem[30];
 	SCR_ENTRY *bg1_map = se_mem[28];
 	SCR_ENTRY *bg2_map = se_mem[26];
 
+	// load in the sprites
+	init_sprites();
+	memcpy(pal_obj_mem, spritesPal, spritesPalLen);
+	memcpy(&tile_mem[4][0], spritesTiles, spritesTilesLen);
+
  reset:
-	// generate the starting buildings
+	game_state = STATE_TITLE;
+	
+	// Set up title screen
+	REG_DISPCNT = DCNT_MODE0 | DCNT_BG1 | DCNT_BG2;
+	
+	// Fill backgrounds for title
+	REG_BG1CNT = BG_PRIO(0) | BG_CBB(1) | BG_SBB(28) | BG_4BPP | BG_REG_64x32;
+	REG_BG2CNT = BG_PRIO(1) | BG_CBB(2) | BG_SBB(26) | BG_4BPP | BG_REG_64x32;
+	for (int i = 0; i < BG0_WIDTH; i++) {
+		for (int j = 0; j < BG0_HEIGHT; j++) {
+			bg1_map[se_index_fast(i, j, REG_BG1CNT)] = SE_PALBANK(MIDGROUND_PB) | midgroundMap[64*j+i];
+			bg2_map[se_index_fast(i, j, REG_BG2CNT)] = SE_PALBANK(BACKGROUND_PB) | backgroundMap[64*j+i];
+		}
+	}
+	
+	draw_title_screen();
+	
+	// Title screen loop
+	while (game_state == STATE_TITLE) {
+		VBlankIntrWait();
+		key_poll();
+		
+		title_blink_counter++;
+		
+		if (key_hit(KEY_A)) {
+			clear_title_screen();
+			game_state = STATE_PLAYING;
+			break;
+		}
+	}
+	
+	// Generate the starting buildings
 	curr_build = 0;
 	starts[0] = 0;
 	builds[0] = generate_build();
@@ -130,13 +197,13 @@ int main(void) {
 		builds[i] = generate_build();
 	}
 
-	// fill in the initial bg0
-	REG_BG0CNT = BG_PRIO(0) | BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_64x32; // apply bg settings
+	// Fill in the initial bg0
+	REG_BG0CNT = BG_PRIO(0) | BG_CBB(0) | BG_SBB(30) | BG_4BPP | BG_REG_64x32;
 	for (int col = 0; col <= (SCREEN_WIDTH >> 3); col++) {
 		draw_col(bg0_map, col);
 	}
 
-	// fill in the midground bg1 and background bg2
+	// Fill in the midground bg1 and background bg2
 	REG_BG1CNT = BG_PRIO(1) | BG_CBB(1) | BG_SBB(28) | BG_4BPP | BG_REG_64x32;
 	REG_BG2CNT = BG_PRIO(2) | BG_CBB(2) | BG_SBB(26) | BG_4BPP | BG_REG_64x32;
 	for (int i = 0; i < BG0_WIDTH; i++) {
@@ -147,23 +214,19 @@ int main(void) {
 	}
 
 	REG_DISPCNT = DCNT_MODE0 | DCNT_BG0 | DCNT_BG1 | DCNT_BG2 | DCNT_OBJ | DCNT_OBJ_1D;
-
-	// load in the sprites
-	init_sprites();
-	memcpy(pal_obj_mem, spritesPal, spritesPalLen);
-	memcpy(&tile_mem[4][0], spritesTiles, spritesTilesLen);
 	
-	// set the starting sprites
+	// Set the starting sprites
 	cam = (camera_t){0, 96, 5, 5};
 	guy.s.obj = NULL;
 	guy.s.x = 30; guy.s.height = PIXEL(CURR_BUILD.height) + 30;
-	guy.vx = 0; guy.vy = 0; guy.ax = 0; guy.ax = 0;
+	guy.vx = 0; guy.vy = 0; guy.ax = 0; guy.ay = 0;
 	guy.state = RUN; guy.anim = ANIM_RUN;
 	guy.s.shape = ATTR0_TALL;
 	guy.s.size = ATTR1_SIZE_8;
 	guy.s.palbank = 0;
 	guy.s.tile = guy.anim.start;
-	// score sprites
+	
+	// Score sprites
 	for (int i = 0; i < 8; i++) {
 		score_objs[i] = new_obj();
 		obj_set_attr(score_objs[i],
@@ -190,8 +253,25 @@ int main(void) {
 		VBlankIntrWait();
 		key_poll();
 
-		// apply camera x adjustment
-		int cam_delta_x = key_tri_horz() * cam.vx;
+		// Gestion de la pause avec Start
+		if (key_hit(KEY_START)) {
+			if (game_state == STATE_PLAYING) {
+				game_state = STATE_PAUSED;
+				draw_pause_screen();
+			} else if (game_state == STATE_PAUSED) {
+				game_state = STATE_PLAYING;
+				clear_title_screen();
+			}
+		}
+
+		// Ne pas mettre à jour le jeu si en pause
+		if (game_state == STATE_PAUSED) {
+			copy_objs();
+			continue;
+		}
+
+		// AUTO-RUN: Le personnage avance automatiquement
+		int cam_delta_x = cam.vx;  // Toujours avance à vitesse constante
 		cam.x += cam_delta_x;
 		guy.s.x += cam_delta_x;
 		
@@ -344,8 +424,8 @@ int main(void) {
 		place_sprite(&guy.s, &cam);
 
 		// apply crate attributes
-		for (int i = 0; i < MAX_CRATES; i++) { // turn this into a circular buffer when
-			if (crates[i].valid) { // we start caring about efficiency
+		for (int i = 0; i < MAX_CRATES; i++) {
+			if (crates[i].valid) {
 				if (crates[i].ay) {
 					crates[i].vy += crates[i].ay;
 					crates[i].s.height += (int)crates[i].vy;
@@ -362,7 +442,8 @@ int main(void) {
 			}
 		}
 
-		set_score(num_crates);//cam.x >> 3);
+		// CORRECTION DU SCORE : Affiche les mètres parcourus, pas le nombre de caisses
+		set_score(cam.x >> 3);
 
 		// update bg regs
 		REG_BG0HOFS = cam.x;
@@ -378,5 +459,3 @@ int main(void) {
 
 	return 0;
 }
-
-
